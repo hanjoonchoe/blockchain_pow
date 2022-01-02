@@ -1,5 +1,11 @@
+use std::alloc::System;
 use std::any::Any;
 use std::collections::{HashMap, LinkedList};
+use std::hash::Hash;
+use std::ptr::null;
+extern crate chrono;
+use chrono::offset::Utc;
+use chrono::DateTime;
 use hex_literal::hex;
 use sha2::{Sha256, Sha512, Digest};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -7,6 +13,7 @@ extern crate serde;
 extern crate serde_json;
 
 pub trait UnitUBlock {
+    fn to_string(&self) -> String;
     fn compute_hash(&self, proof: String) -> String;
     fn change_nonce(&self, tmp_nonce: i32);
     fn get_hash(&self) -> String;
@@ -17,8 +24,9 @@ pub struct Block {
     pub index : i32,
     pub transactions : LinkedList<String>,
     pub timestamp : String,
+    pub previous_hash : String,
+    pub nonce : i32,
     pub hash : String,
-    pub nonce : i32
 }
 
 impl UnitUBlock for Block {
@@ -26,8 +34,17 @@ impl UnitUBlock for Block {
         let mut hasher = Sha256::new();
         let serialized = serde_json::to_string(&block).unwrap();
         hasher.update(serialized);
-        let result = hasher.finalize();
+        let result = format!("{:X}", hasher.finalize());
         return result;
+    }
+
+    fn to_string(&self) -> String {
+        let mut transactions_string = "".to_string();
+        for value in self.transactions.iter() {
+            transactions_string += value;
+        }
+        format!("{{index:{},transactions:{},timestamp:{},previous_hash:{},nonce:{},hash{}}}",
+                self.index, transactions_string, self.timestamp, self.previous_hash, self.nonce, self.hash)
     }
 
     fn change_nonce(&mut self, tmp_nonce: i32) {
@@ -46,8 +63,9 @@ impl UnitUBlock for Block {
 }
 
 pub trait Chain {
-    fn create_genesis_block(&self);
-    fn last_block(&self);
+    fn new() -> Self;
+    fn create_genesis_block(&mut self);
+    fn last_block(&self) -> &Block;
     fn proof_of_work(&self, block: Block) -> String;
     fn add_block(&self, block: Block, proof: String) -> bool;
     fn is_valid_proof(&self, block: Block, block_hash: String) -> bool;
@@ -58,20 +76,48 @@ pub trait Chain {
 pub struct BlockChain {
     pub unconfirmed_transactions : LinkedList<String>,
     pub chain : LinkedList<Block>,
-    pub difficulty : i32
+    pub difficulty : i32,
+    pub hash : String
 }
 
 impl Chain for BlockChain {
-    fn create_genesis_block(&self) {
+
+    fn new() -> Self {
+        let init_unconfirmed_transaction : LinkedList<String> = LinkedList::new();
+        let init_chain : LinkedList<Block> = LinkedList::new();
+        let mut value = Self {
+            unconfirmed_transactions: init_unconfirmed_transaction,
+            chain: init_chain,
+            difficulty: 4,
+            hash: "".to_string()
+        };
+        value.create_genesis_block();
+
+        return value;
+    }
+    fn create_genesis_block(&mut self) {
         /// 제네시스 블록(최초의 블록)을 생성하는 함수.
         ///
-        todo!()
+        let init_list: LinkedList<String> = LinkedList::new();
+        let system_time = SystemTime::now();
+        let now: DateTime<Utc> = system_time.into();
+
+        let mut genesis_block: Block = Block {
+            index: 0,
+            transactions: init_list,
+            timestamp: now.format("%d/%m/%Y %T").to_string(),
+            previous_hash: "0".to_string(),
+            nonce: 0,
+            hash: "".to_string()
+        };
+        genesis_block.hash = genesis_block.compute_hash();
+        self.chain.push_back(genesis_block);
     }
 
-    fn last_block(&self) {
+    fn last_block(&self) -> &Block {
         /// 현 시점에서 가장 마지막 블록을 반환하는 함수.
         ///
-        todo!()
+        return self.chain.back().unwrap();
     }
 
     fn proof_of_work(&self, mut block: Block) -> String {
@@ -99,7 +145,7 @@ impl Chain for BlockChain {
         if !self.is_valid_proof(block, proof){
             return False;
         }
-        block.set_hash(proof);
+        // block.set_hash(proof);
         todo!()
     }
 
@@ -126,5 +172,9 @@ impl Chain for BlockChain {
 }
 
 fn main() {
-    todo!()
+    let sample_chain: BlockChain = BlockChain::new();
+    for block in sample_chain.chain.iter() {
+        println!("{}", block.to_string());
+    }
+    println!("end");
 }
