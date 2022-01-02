@@ -12,12 +12,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 extern crate serde;
 extern crate serde_json;
 
+
 pub trait UnitUBlock {
     fn to_string(&self) -> String;
-    fn compute_hash(&self, proof: String) -> String;
-    fn change_nonce(&self, tmp_nonce: i32);
-    fn get_hash(&self) -> String;
-    fn set_hash(&self, hash: String) -> String;
+    fn compute_hash(&self) -> String;
+    fn change_nonce(&mut self, tmp_nonce: i32);
+    fn get_hash(&self) -> &String;
+    fn set_hash(&mut self, hash: String);
 }
 
 pub struct Block {
@@ -30,14 +31,6 @@ pub struct Block {
 }
 
 impl UnitUBlock for Block {
-    fn compute_hash(&self, block: Block) -> String {
-        let mut hasher = Sha256::new();
-        let serialized = serde_json::to_string(&block).unwrap();
-        hasher.update(serialized);
-        let result = format!("{:X}", hasher.finalize());
-        return result;
-    }
-
     fn to_string(&self) -> String {
         let mut transactions_string = "".to_string();
         for value in self.transactions.iter() {
@@ -47,14 +40,22 @@ impl UnitUBlock for Block {
                 self.index, transactions_string, self.timestamp, self.previous_hash, self.nonce, self.hash)
     }
 
+    fn compute_hash(&self) -> String {
+        let mut hasher = Sha256::new();
+        let serialized = serde_json::to_string(&self.to_string()).unwrap();
+        hasher.update(serialized);
+        let result = format!("{:X}", hasher.finalize());
+        return result;
+    }
+
     fn change_nonce(&mut self, tmp_nonce: i32) {
-        /// nonce를 바꿈
+        // nonce를 바꿈
         self.nonce = tmp_nonce;
     }
 
     fn get_hash(&self) -> &String {
         /// 해당 블럭의 해시값을 가져옴
-        &self.hash;
+        &self.hash
     }
 
     fn set_hash(&mut self, hash: String) {
@@ -126,36 +127,28 @@ impl Chain for BlockChain {
         /// 예) difficulty가 4이면 sha256 해쉬값의 앞 네자리 수가 무조건 0000으로 시작.
 
         let computed_hash = block.compute_hash();
-        while computed_hash.starts_with("0"*4){
+        let mut tmp_nonce = 0;
+        while computed_hash.starts_with("0000"){
             tmp_nonce += 1;
             block.change_nonce(tmp_nonce);
         }
         return computed_hash;
-        todo!()
     }
 
     fn add_block(&self, mut block: Block, proof: String) -> bool {
-        /// 최한준
-        /// 블록을 추가하는 함수.
-
-        previous_hash = block.get_hash();
-        ///if previous_hash != block.last_block.hash{
-        ///    return False;
-        ///}
+        let mut previous_hash = block.get_hash();
         if !self.is_valid_proof(block, proof){
-            return False;
+            return false;
         }
         // block.set_hash(proof);
-        todo!()
+        todo!("add block 기능 완료")
     }
 
     fn is_valid_proof(&self, block: Block, proof: String) -> bool {
-        /// 최한준
         /// 블록을 검증하는 함수. 조건에 부합하는지(시작이 0000인지 등).
         ///
-        let is_valid = proof.starts_with("0"*4)& (proof==block.compute_hash());
+        let is_valid = proof.starts_with("0000")& (proof==block.compute_hash());
         return is_valid;
-        todo!()
     }
 
     fn add_new_transaction(&self, transaction: String) {
