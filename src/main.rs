@@ -9,6 +9,9 @@ use chrono::DateTime;
 use hex_literal::hex;
 use sha2::{Sha256, Sha512, Digest};
 use std::time::{SystemTime, UNIX_EPOCH};
+// use serde_json::Value::String;
+use std::string::String;
+
 extern crate serde;
 extern crate serde_json;
 
@@ -17,10 +20,13 @@ pub trait UnitUBlock {
     fn to_string(&self) -> String;
     fn compute_hash(&self) -> String;
     fn change_nonce(&mut self, tmp_nonce: i32);
+    // fn add_transactions(&mut self, transaction: LinkedList<String>);
+    // fn get_transactions(self);
     fn get_hash(&self) -> &String;
     fn set_hash(&mut self, hash: String);
 }
 
+#[derive(Clone)]
 pub struct Block {
     pub index : i32,
     pub transactions : LinkedList<String>,
@@ -53,6 +59,14 @@ impl UnitUBlock for Block {
         self.nonce = tmp_nonce;
     }
 
+    // fn add_transactions(&mut self, transactions: LinkedList<String>) {
+    //     self.transactions = transactions;
+    // }
+    //
+    // fn get_transactions(self) -> LinkedList<String>{
+    //     self.transactions;
+    // }
+
     fn get_hash(&self) -> &String {
         /// 해당 블럭의 해시값을 가져옴
         &self.hash
@@ -68,10 +82,10 @@ pub trait Chain {
     fn create_genesis_block(&mut self);
     fn last_block(&self) -> &Block;
     fn proof_of_work(&self, block: Block) -> String;
-    fn add_block(&self, block: Block, proof: String) -> bool;
-    fn is_valid_proof(&self, block: Block, block_hash: String) -> bool;
-    fn add_new_transaction(&self, transaction: String);
-    fn mine(&self) -> i32;
+    fn add_block(&mut self, block: Block, proof: String) -> bool;
+    fn is_valid_proof(&self, block: &Block, block_hash: &String) -> bool;
+    // fn add_new_transaction(&mut self, transaction: String);
+    fn mine(&mut self, transactions: LinkedList<String>) -> i32;
 }
 
 pub struct BlockChain {
@@ -135,39 +149,80 @@ impl Chain for BlockChain {
         return computed_hash;
     }
 
-    fn add_block(&self, mut block: Block, proof: String) -> bool {
-        let mut previous_hash = block.get_hash();
-        if !self.is_valid_proof(block, proof){
+    fn add_block(&mut self, mut block: Block, proof: String) -> bool {
+        let previous_hash = self.last_block().get_hash();
+        if !String::eq(previous_hash, &proof) {
             return false;
         }
-        // block.set_hash(proof);
-        todo!("add block 기능 완료")
+        if !self.is_valid_proof(&block, &proof){
+            return false;
+        }
+        block.set_hash(proof);
+        self.chain.push_back(block);
+
+        return true;
     }
 
-    fn is_valid_proof(&self, block: Block, proof: String) -> bool {
+    fn is_valid_proof(&self, block: &Block, proof: &String) -> bool {
         /// 블록을 검증하는 함수. 조건에 부합하는지(시작이 0000인지 등).
         ///
-        let is_valid = proof.starts_with("0000")& (proof==block.compute_hash());
+        let is_valid = proof.starts_with("0000")& (proof.eq(&block.compute_hash()));
         return is_valid;
     }
 
-    fn add_new_transaction(&self, transaction: String) {
-        /// 거래 내역을 새로 추가하는 함수.
-        ///
-        todo!()
-    }
+    // fn add_new_transaction(&mut self, transaction: String) {
+    //     /// 거래 내역을 새로 추가하는 함수.
+    //     self.unconfirmed_transactions.push_back(transaction);
+    // }
 
-    fn mine(&self) -> i32 {
+    fn mine(&mut self, transactions: LinkedList<String>) -> i32 {
         /// 전체 파이프라인을 한번 실행하는 함수
         ///
-        todo!()
+        if !transactions.is_empty() {
+            return -1;
+        }
+        let last_block = self.last_block();
+
+        let system_time = SystemTime::now();
+        let now: DateTime<Utc> = system_time.into();
+
+        let new_block: Block = Block {
+            index: 0,
+            transactions: transactions,
+            timestamp: now.format("%d/%m/%Y %T").to_string(),
+            previous_hash: last_block.get_hash().clone(),
+            nonce: 0,
+            hash: "".to_string()
+        };
+        let proof = self.proof_of_work(new_block.clone());
+        // new_block.set_transactions(["확인용"]);
+        self.add_block(new_block, proof);
+        // self.set_transactions(["확인용"]);
+
+        return 1;
     }
+    // def mine(self):
+        // proof = self.proof_of_work(new_block)
+        // self.add_block(new_block,proof)
+        // self.unconfirmed_transactions = []
+        //
+        // return new_block.index
+
 }
 
 fn main() {
-    let sample_chain: BlockChain = BlockChain::new();
+    //Initialize block
+    let mut sample_chain: BlockChain = BlockChain::new();
+    let mut list1 = LinkedList::new();
+    list1.push_back(String::from("hyeokmin kwon"));
+    for li in list1.clone() {
+        println!("{}", li);
+    }
+    sample_chain.mine(list1);
+
     for block in sample_chain.chain.iter() {
         println!("{}", block.to_string());
     }
+
     println!("end");
 }
