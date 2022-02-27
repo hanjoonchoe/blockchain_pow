@@ -1,7 +1,6 @@
 use std::alloc::System;
 use std::any::Any;
 use std::collections::{HashMap, LinkedList};
-use std::hash::Hash;
 use std::ptr::null;
 extern crate chrono;
 use chrono::offset::Utc;
@@ -42,7 +41,7 @@ impl UnitUBlock for Block {
         for value in self.transactions.iter() {
             transactions_string += value;
         }
-        format!("{{index:{},transactions:{},timestamp:{},previous_hash:{},nonce:{},hash{}}}",
+        format!("{{index:{},transactions:{},timestamp:{},previous_hash:{},nonce:{},hash:{}}}",
                 self.index, transactions_string, self.timestamp, self.previous_hash, self.nonce, self.hash)
     }
 
@@ -68,7 +67,7 @@ impl UnitUBlock for Block {
     // }
 
     fn get_hash(&self) -> &String {
-        /// 해당 블럭의 해시값을 가져옴
+        // 해당 블럭의 해시값을 가져옴
         &self.hash
     }
 
@@ -111,8 +110,7 @@ impl Chain for BlockChain {
         return value;
     }
     fn create_genesis_block(&mut self) {
-        /// 제네시스 블록(최초의 블록)을 생성하는 함수.
-        ///
+        // 제네시스 블록(최초의 블록)을 생성하는 함수.
         let init_list: LinkedList<String> = LinkedList::new();
         let system_time = SystemTime::now();
         let now: DateTime<Utc> = system_time.into();
@@ -130,43 +128,48 @@ impl Chain for BlockChain {
     }
 
     fn last_block(&self) -> &Block {
-        /// 현 시점에서 가장 마지막 블록을 반환하는 함수.
-        ///
+        // 현 시점에서 가장 마지막 블록을 반환하는 함수.
         return self.chain.back().unwrap();
     }
 
     fn proof_of_work(&self, mut block: Block) -> String {
-        /// 최한준
-        /// 주어진 조건에 부합하는 해쉬값이 존재하는지 확인하는 함수.
-        /// 예) difficulty가 4이면 sha256 해쉬값의 앞 네자리 수가 무조건 0000으로 시작.
+        // 주어진 조건에 부합하는 해쉬값이 존재하는지 확인하는 함수.
+        // 예) difficulty가 4이면 sha256 해쉬값의 앞 네자리 수가 무조건 0000으로 시작.
 
-        let computed_hash = block.compute_hash();
         let mut tmp_nonce = 0;
-        while computed_hash.starts_with("0000"){
+        let mut difficulty = String::from("");
+        for _i in 0..self.difficulty {
+            difficulty += "0";
+        }
+        while !block.hash.starts_with(&difficulty){
             tmp_nonce += 1;
             block.change_nonce(tmp_nonce);
+            block.hash = block.compute_hash();
         }
-        return computed_hash;
+        return block.hash;
     }
 
     fn add_block(&mut self, mut block: Block, proof: String) -> bool {
         let previous_hash = self.last_block().get_hash();
-        if !String::eq(previous_hash, &proof) {
+        block.set_hash(proof.clone());
+        if String::eq(previous_hash, &proof) {
             return false;
         }
         if !self.is_valid_proof(&block, &proof){
             return false;
         }
-        block.set_hash(proof);
         self.chain.push_back(block);
 
         return true;
     }
 
     fn is_valid_proof(&self, block: &Block, proof: &String) -> bool {
-        /// 블록을 검증하는 함수. 조건에 부합하는지(시작이 0000인지 등).
-        ///
-        let is_valid = proof.starts_with("0000")& (proof.eq(&block.compute_hash()));
+        // 블록을 검증 하는 함수. 조건에 부합 하는지(시작이 0000인지 등).
+        let mut difficulty = String::from("");
+        for _i in 0..self.difficulty {
+            difficulty += "0";
+        }
+        let is_valid = proof.to_string().starts_with(&difficulty) & (proof.to_string().eq(&block.get_hash().to_string()));
         return is_valid;
     }
 
@@ -176,9 +179,8 @@ impl Chain for BlockChain {
     // }
 
     fn mine(&mut self, transactions: LinkedList<String>) -> i32 {
-        /// 전체 파이프라인을 한번 실행하는 함수
-        ///
-        if !transactions.is_empty() {
+        // 전체 파이프라인을 한번 실행하는 함수
+        if transactions.is_empty() {
             return -1;
         }
         let last_block = self.last_block();
@@ -187,7 +189,7 @@ impl Chain for BlockChain {
         let now: DateTime<Utc> = system_time.into();
 
         let new_block: Block = Block {
-            index: 0,
+            index: last_block.index + 1,
             transactions: transactions,
             timestamp: now.format("%d/%m/%Y %T").to_string(),
             previous_hash: last_block.get_hash().clone(),
@@ -195,9 +197,7 @@ impl Chain for BlockChain {
             hash: "".to_string()
         };
         let proof = self.proof_of_work(new_block.clone());
-        // new_block.set_transactions(["확인용"]);
         self.add_block(new_block, proof);
-        // self.set_transactions(["확인용"]);
 
         return 1;
     }
@@ -214,11 +214,21 @@ fn main() {
     //Initialize block
     let mut sample_chain: BlockChain = BlockChain::new();
     let mut list1 = LinkedList::new();
-    list1.push_back(String::from("hyeokmin kwon"));
+    list1.push_back(String::from("hyeokmin kwon "));
+    list1.push_back(String::from("hanjoon choe"));
     for li in list1.clone() {
         println!("{}", li);
     }
     sample_chain.mine(list1);
+
+    let mut list2 = LinkedList::new();
+    list2.push_back(String::from("hyeokmin kwon "));
+    list2.push_back(String::from("hanjoon choe"));
+
+    for li in list2.clone() {
+        println!("{}", li);
+    }
+    sample_chain.mine(list2);
 
     for block in sample_chain.chain.iter() {
         println!("{}", block.to_string());
